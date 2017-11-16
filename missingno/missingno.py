@@ -1,10 +1,13 @@
 import numpy as np
+import matplotlib as mpl
 from matplotlib import gridspec
 import matplotlib.pyplot as plt
 from scipy.cluster import hierarchy
 import seaborn as sns
 import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+__version__ = "0.3.5"
 
 
 def _ascending_sort(df):
@@ -198,7 +201,7 @@ def matrix(df,
     if freq:
         ts_list = []
 
-        if type(df.index) == pd.tseries.period.PeriodIndex:
+        if type(df.index) == pd.PeriodIndex:
             ts_array = pd.date_range(df.index.to_timestamp().date[0],
                                      df.index.to_timestamp().date[-1],
                                      freq=freq).values
@@ -247,12 +250,19 @@ def matrix(df,
         # Set up the sparkline.
         ax1.grid(b=False)
         ax1.set_aspect('auto')
-        ax1.set_axis_bgcolor((1, 1, 1))
+        # set_facecolor in mpl >= 2.0.0, set_axis_bgcolor in mpl < 2.0.0
+        # GH 25
+        if int(mpl.__version__[0]) <= 1:
+            ax1.set_axis_bgcolor((1, 1, 1))
+        else:
+            ax1.set_facecolor((1, 1, 1))
         # Remove the black border.
         ax1.spines['top'].set_visible(False)
         ax1.spines['right'].set_visible(False)
         ax1.spines['bottom'].set_visible(False)
         ax1.spines['left'].set_visible(False)
+        # Set y-margin to 0.
+        ax1.set_ymargin(0)
 
         # Plot sparkline---plot is sideways so the x and y axis are reversed.
         ax1.plot(y_range, x_domain, color=color)
@@ -301,7 +311,7 @@ def matrix(df,
     if inline:
         plt.show()
     else:
-        return plt
+        return fig
 
 
 def bar(df, figsize=(24, 10), fontsize=16, labels=None, log=False, color=(0.25, 0.25, 0.25), inline=True,
@@ -343,7 +353,6 @@ def bar(df, figsize=(24, 10), fontsize=16, labels=None, log=False, color=(0.25, 
 
     # Start appending elements, starting with a modified bottom x axis.
     if labels or (labels is None and len(df.columns) <= 50):
-        pos = ax1.get_xticks()
         ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right', fontsize=fontsize)
 
         # Create the numerical ticks.
@@ -366,7 +375,7 @@ def bar(df, figsize=(24, 10), fontsize=16, labels=None, log=False, color=(0.25, 
 
     # Create the third axis, which displays columnar totals above the rest of the plot.
     ax3 = ax1.twiny()
-    ax3.set_xticks(pos)
+    ax3.set_xticks(ax1.get_xticks())
     ax3.set_xlim(ax1.get_xlim())
     ax3.set_xticklabels(nullity_counts.values, fontsize=fontsize, rotation=45, ha='left')
     ax3.grid(False)
@@ -415,7 +424,7 @@ def heatmap(df, inline=True,
     ax0 = plt.subplot(gs[0])
 
     # Pre-processing: remove completely filled or completely empty variables.
-    df = df[[i for i, n in enumerate(np.var(df.isnull(), axis='rows')) if n > 0]]
+    df = df.iloc[:,[i for i, n in enumerate(np.var(df.isnull(), axis='rows')) if n > 0]]
 
     # Create and mask the correlation matrix.
     corr_mat = df.isnull().corr()
